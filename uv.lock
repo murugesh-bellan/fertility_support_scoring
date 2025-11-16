@@ -165,7 +165,7 @@ wheels = [
 ]
 
 [[package]]
-name = "fertility-support-agent"
+name = "fertility-support-scoring"
 version = "0.1.0"
 source = { editable = "." }
 dependencies = [

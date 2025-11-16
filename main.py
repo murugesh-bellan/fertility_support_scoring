@@ -11,6 +11,7 @@ from typing import Optional
 from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import Response
+from langsmith import uuid7
 from pydantic import SecretStr
 from pydantic_settings import BaseSettings
 from slowapi import Limiter, _rate_limit_exceeded_handler
@@ -122,7 +123,7 @@ async def score_message(request: Request, score_request: ScoreRequest) -> ScoreR
     """Score a message for emotional distress."""
     global cache_hits, cache_misses
 
-    correlation_id = str(uuid.uuid4())
+    correlation_id = str(uuid7())
     start_time = time.time()
 
     try:
@@ -156,8 +157,27 @@ async def score_message(request: Request, score_request: ScoreRequest) -> ScoreR
             cache_misses += 1
             pass
 
-        # Score the message
-        result = await agent.score_message(message)
+        # Prepare LangSmith metadata (let LangSmith auto-generate run_id)
+        langsmith_config = {
+            "metadata": {
+                "request_id": correlation_id,
+                "message_hash": message_hash,
+                "injection_detected": is_injection,
+                "injection_patterns": patterns if is_injection else [],
+                "message_length": len(message),
+                "cache_enabled": settings.cache_enabled,
+                "environment": "production",  # Customize as needed
+                # Add any additional custom fields here
+            },
+            "tags": [
+                "fertility-support",
+                "emotional-scoring",
+                f"injection-{'detected' if is_injection else 'clean'}",
+            ],
+        }
+
+        # Score the message with LangSmith metadata
+        result = await agent.score_message(message, config=langsmith_config)
 
         # Calculate metrics
         latency = time.time() - start_time

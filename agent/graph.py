@@ -157,7 +157,7 @@ class ScoringAgent:
             state["action_rationale"] = "Message is not related to fertility or emotional support"
             return "end"
 
-    async def score_message(self, message: str) -> dict:
+    async def score_message(self, message: str, config: dict = None) -> dict:
         """Score a message and return results."""
         initial_state: AgentState = {
             "message": message,
@@ -173,8 +173,8 @@ class ScoringAgent:
             "start_time": time.time(),
         }
 
-        # Run the graph
-        final_state = await self.graph.ainvoke(initial_state)
+        # Run the graph with optional config for LangSmith metadata
+        final_state = await self.graph.ainvoke(initial_state, config=config)
 
         # Calculate latency
         latency_ms = int((time.time() - final_state["start_time"]) * 1000)
