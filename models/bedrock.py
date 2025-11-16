@@ -122,8 +122,9 @@ class HolisticAIBedrockChat(BaseChatModel):
 
             message = AIMessage(content=content)
             generation = ChatGeneration(message=message)
+            chat_result = ChatResult(generations=[generation])
 
-            return ChatResult(generations=[generation])
+            return chat_result
 
         except httpx.HTTPStatusError as e:
             error_msg = f"Error calling Holistic AI Bedrock API: {e}"
@@ -203,8 +204,9 @@ class HolisticAIBedrockChat(BaseChatModel):
 
             message = AIMessage(content=content)
             generation = ChatGeneration(message=message)
+            chat_result = ChatResult(generations=[generation])
 
-            return ChatResult(generations=[generation])
+            return chat_result
 
         except httpx.HTTPStatusError as e:
             error_msg = f"Error calling Holistic AI Bedrock API: {e}"

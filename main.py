@@ -74,11 +74,20 @@ setup_logging(settings.log_level)
 logger = logging.getLogger(__name__)
 
 # Setup LangSmith if configured
+langsmith_enabled = False
 if settings.langsmith_api_key and settings.langsmith_tracing:
-    os.environ["LANGCHAIN_TRACING_V2"] = "true"
-    os.environ["LANGCHAIN_API_KEY"] = settings.langsmith_api_key
-    os.environ["LANGCHAIN_PROJECT"] = settings.langsmith_project
-    os.environ["LANGCHAIN_ENDPOINT"] = settings.langsmith_endpoint
+    try:
+        os.environ["LANGCHAIN_TRACING_V2"] = "true"
+        os.environ["LANGCHAIN_API_KEY"] = settings.langsmith_api_key
+        os.environ["LANGCHAIN_PROJECT"] = settings.langsmith_project
+        os.environ["LANGCHAIN_ENDPOINT"] = settings.langsmith_endpoint
+        langsmith_enabled = True
+        logger.info(f"LangSmith tracing enabled for project: {settings.langsmith_project}")
+    except Exception as e:
+        logger.warning(f"Failed to initialize LangSmith tracing: {e}")
+        langsmith_enabled = False
+else:
+    logger.info("LangSmith tracing disabled")
 
 # Initialize FastAPI
 app = FastAPI(
@@ -109,6 +118,23 @@ cache_hits = 0
 cache_misses = 0
 
 
+def construct_langsmith_url(run_id: str, project: str, endpoint: str) -> str:
+    """Construct LangSmith trace URL from run_id.
+
+    Note: This constructs a best-effort URL. The actual URL format may vary
+    based on your LangSmith organization settings.
+    """
+    # Try to construct URL - format may need adjustment based on your org
+    # Common formats:
+    # - https://smith.langchain.com/o/{org_id}/projects/p/{project}/r/{run_id}
+    # - For direct access, you can also use: {endpoint}/runs/{run_id}
+
+    # Use a simplified format that should work for most cases
+    base_url = endpoint.rstrip("/")
+    # This will link to the run page - users may need to select their org
+    return f"{base_url}/projects/{project}/runs/{run_id}"
+
+
 @lru_cache(maxsize=100)
 def cached_score(message_hash: str, message: str) -> dict:
     """Cache scoring results by message hash."""
@@ -123,7 +149,9 @@ async def score_message(request: Request, score_request: ScoreRequest) -> ScoreR
     """Score a message for emotional distress."""
     global cache_hits, cache_misses
 
-    correlation_id = str(uuid7())
+    # Generate UUID v7 for correlation and LangSmith run_id
+    correlation_uuid = uuid7()
+    correlation_id = str(correlation_uuid)
     start_time = time.time()
 
     try:
@@ -157,27 +185,35 @@ async def score_message(request: Request, score_request: ScoreRequest) -> ScoreR
             cache_misses += 1
             pass
 
-        # Prepare LangSmith metadata (let LangSmith auto-generate run_id)
-        langsmith_config = {
-            "metadata": {
-                "request_id": correlation_id,
-                "message_hash": message_hash,
-                "injection_detected": is_injection,
-                "injection_patterns": patterns if is_injection else [],
-                "message_length": len(message),
-                "cache_enabled": settings.cache_enabled,
-                "environment": "production",  # Customize as needed
-                # Add any additional custom fields here
-            },
-            "tags": [
-                "fertility-support",
-                "emotional-scoring",
-                f"injection-{'detected' if is_injection else 'clean'}",
-            ],
-        }
+        # Prepare LangSmith config with proper structure
+        langsmith_config = None
+        if langsmith_enabled:
+            langsmith_config = {
+                "run_name": "score_message",
+                "run_id": correlation_uuid,  # Use UUID object, not string
+                "metadata": {
+                    "request_id": correlation_id,
+                    "message_hash": message_hash,
+                    "injection_detected": is_injection,
+                    "injection_patterns": patterns if is_injection else [],
+                    "message_length": len(message),
+                    "cache_enabled": settings.cache_enabled,
+                    "environment": "production",
+                },
+                "tags": [
+                    "fertility-support",
+                    "emotional-scoring",
+                    f"injection-{'detected' if is_injection else 'clean'}",
+                ],
+            }
 
         # Score the message with LangSmith metadata
-        result = await agent.score_message(message, config=langsmith_config)
+        result = await agent.score_message(
+            message,
+            config=langsmith_config,
+            langsmith_enabled=langsmith_enabled,
+            run_id=correlation_id
+        )
 
         # Calculate metrics
         latency = time.time() - start_time
@@ -217,6 +253,15 @@ async def score_message(request: Request, score_request: ScoreRequest) -> ScoreR
             action=result["recommended_action"].value,
         ).inc()
 
+        # Construct LangSmith trace URL if enabled
+        run_url = None
+        if langsmith_enabled and "run_id" in result:
+            run_url = construct_langsmith_url(
+                result["run_id"],
+                settings.langsmith_project,
+                settings.langsmith_endpoint
+            )
+
         # Build response
         response = ScoreResponse(
             score=result["score"],
@@ -227,6 +272,7 @@ async def score_message(request: Request, score_request: ScoreRequest) -> ScoreR
             recommended_action=result["recommended_action"],
             action_rationale=result["action_rationale"],
             trace_id=correlation_id,
+            run_url=run_url,
             latency_ms=result["latency_ms"],
             tokens_used=result["tokens_used"],
             injection_detected=is_injection,

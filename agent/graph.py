@@ -157,7 +157,13 @@ class ScoringAgent:
             state["action_rationale"] = "Message is not related to fertility or emotional support"
             return "end"
 
-    async def score_message(self, message: str, config: dict = None) -> dict:
+    async def score_message(
+        self,
+        message: str,
+        config: dict = None,
+        langsmith_enabled: bool = False,
+        run_id: str = None
+    ) -> dict:
         """Score a message and return results."""
         initial_state: AgentState = {
             "message": message,
@@ -179,7 +185,7 @@ class ScoringAgent:
         # Calculate latency
         latency_ms = int((time.time() - final_state["start_time"]) * 1000)
 
-        return {
+        result = {
             "score": final_state["score"],
             "confidence": final_state["confidence"],
             "domain_match": final_state["domain_match"],
@@ -190,3 +196,9 @@ class ScoringAgent:
             "tokens_used": final_state["tokens_used"],
             "latency_ms": latency_ms,
         }
+
+        # Add run_id if LangSmith is enabled
+        if langsmith_enabled and run_id:
+            result["run_id"] = run_id
+
+        return result
