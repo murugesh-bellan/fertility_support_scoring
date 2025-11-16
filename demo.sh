@@ -5,7 +5,7 @@ set -e
 
 BASE_URL="http://localhost:8000"
 
-echo "🤖 Fertility Support Agent Demo"
+echo "🤖 Fertility Support Scoring Demo"
 echo "================================"
 echo ""
 

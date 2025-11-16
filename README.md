@@ -1,4 +1,4 @@
-# Fertility Support Agent 🤖💚
+# Fertility Sync/Fertility Support Scoring🤖💚
 
 An agentic AI system that analyzes text messages from women undergoing fertility treatment, scores emotional distress (1-10), and triggers appropriate interventions.
 
@@ -145,7 +145,7 @@ uv run ruff check .
 ## Project Structure
 
 ```
-fertility-support-agent/
+fertility-support-scoring/
 ├── main.py                 # FastAPI server
 ├── agent/
 │   ├── graph.py           # LangGraph agent
