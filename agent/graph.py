@@ -72,15 +72,26 @@ class ScoringAgent:
         result = await self.llm.ainvoke([HumanMessage(content=prompt)])
         response_text = result.content
 
-        # Parse JSON response
+        # Parse JSON response (handle markdown code blocks)
         try:
-            parsed = json.loads(response_text)
+            # Strip markdown code blocks if present
+            cleaned_text = response_text.strip()
+            if cleaned_text.startswith("```"):
+                # Remove ```json or ``` at start and ``` at end
+                lines = cleaned_text.split("\n")
+                if lines[0].startswith("```"):
+                    lines = lines[1:]
+                if lines and lines[-1].strip() == "```":
+                    lines = lines[:-1]
+                cleaned_text = "\n".join(lines).strip()
+
+            parsed = json.loads(cleaned_text)
             state["domain_match"] = parsed.get("domain_match", False)
             state["domain_reasoning"] = parsed.get("reasoning", "")
         except json.JSONDecodeError:
             # Fallback if JSON parsing fails
             state["domain_match"] = False
-            state["domain_reasoning"] = "Failed to parse domain validation response"
+            state["domain_reasoning"] = f"Failed to parse domain validation response: {response_text[:100]}"
 
         # Estimate tokens (rough approximation)
         state["tokens_used"] = state.get("tokens_used", 0) + len(prompt.split()) + len(
@@ -96,9 +107,20 @@ class ScoringAgent:
         result = await self.llm.ainvoke([HumanMessage(content=prompt)])
         response_text = result.content
 
-        # Parse JSON response
+        # Parse JSON response (handle markdown code blocks)
         try:
-            parsed = json.loads(response_text)
+            # Strip markdown code blocks if present
+            cleaned_text = response_text.strip()
+            if cleaned_text.startswith("```"):
+                # Remove ```json or ``` at start and ``` at end
+                lines = cleaned_text.split("\n")
+                if lines[0].startswith("```"):
+                    lines = lines[1:]
+                if lines and lines[-1].strip() == "```":
+                    lines = lines[:-1]
+                cleaned_text = "\n".join(lines).strip()
+
+            parsed = json.loads(cleaned_text)
             state["score"] = parsed.get("score", 5)
             state["confidence"] = parsed.get("confidence", 0.5)
             state["reasoning"] = parsed.get("reasoning", "")
@@ -107,7 +129,7 @@ class ScoringAgent:
             # Fallback if JSON parsing fails
             state["score"] = 5
             state["confidence"] = 0.3
-            state["reasoning"] = "Failed to parse scoring response"
+            state["reasoning"] = f"Failed to parse scoring response: {response_text[:100]}"
             state["key_indicators"] = []
 
         # Estimate tokens

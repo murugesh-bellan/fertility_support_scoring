@@ -45,6 +45,25 @@ cp .env.example .env
 # Edit .env with your credentials
 ```
 
+**OpenAI Configuration (Recommended):**
+
+1. Get your OpenAI API key from [platform.openai.com](https://platform.openai.com/api-keys)
+2. Update your `.env` file:
+   ```bash
+   LLM_PROVIDER=openai
+   OPENAI_API_KEY=sk-your-actual-key-here
+   OPENAI_MODEL=gpt-4o  # or gpt-4o-mini, gpt-4-turbo
+   ```
+
+**HolisticAI Bedrock Configuration (Legacy):**
+
+If you need to use HolisticAI Bedrock instead:
+```bash
+LLM_PROVIDER=holistic_ai
+HOLISTIC_AI_TEAM_ID=your_team_id
+HOLISTIC_AI_API_TOKEN=your_token
+```
+
 ### 3. Run the server
 ```bash
 uv run uvicorn main:app --reload
@@ -93,6 +112,8 @@ The project includes a web-based dashboard (`dashboard.html`) for testing and mo
    ```
 
 #### Dashboard Features
+
+![Fertility Support Agent Dashboard](dashboard.png)
 
 **Real-time Monitoring:**
 - System health status (API, Bedrock, Cache)
@@ -148,6 +169,15 @@ bash demo.sh
 Key development settings in `.env`:
 
 ```bash
+# LLM Provider Configuration
+LLM_PROVIDER=openai  # or "holistic_ai" for legacy Bedrock support
+
+# OpenAI Settings (when LLM_PROVIDER=openai)
+OPENAI_API_KEY=sk-your-key-here
+OPENAI_MODEL=gpt-4o              # Options: gpt-4o, gpt-4o-mini, gpt-4-turbo
+OPENAI_TEMPERATURE=0.7            # 0.0-1.0, higher = more creative
+OPENAI_MAX_TOKENS=1024            # Max response length
+
 # Environment (dev enables CORS for dashboard)
 ENVIRONMENT=dev
 
@@ -162,6 +192,16 @@ LANGSMITH_PROJECT=fertility-support-agent
 # Rate limiting (adjust for testing)
 RATE_LIMIT_PER_MINUTE=60
 ```
+
+**Supported Models:**
+- **OpenAI (Recommended)**:
+  - `gpt-4o` - Latest and most capable (recommended)
+  - `gpt-4o-mini` - Faster and cheaper, good for testing
+  - `gpt-4-turbo` - Previous generation, still very capable
+  - `gpt-3.5-turbo` - Budget option (may have lower accuracy)
+
+- **HolisticAI Bedrock** (Legacy):
+  - `us.anthropic.claude-3-5-sonnet-20241022-v2:0` - Claude via AWS Bedrock proxy
 
 ### Switching to Production
 
@@ -257,6 +297,7 @@ uv run ruff check .
 fertility-support-scoring/
 ├── main.py                 # FastAPI server
 ├── dashboard.html          # Interactive web dashboard (dev mode)
+├── dashboard.png           # Dashboard screenshot
 ├── demo.sh                 # Automated test script
 ├── agent/
 │   ├── graph.py           # LangGraph agent

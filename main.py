@@ -20,6 +20,8 @@ from slowapi import Limiter, _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 from slowapi.util import get_remote_address
 
+from langchain_openai import ChatOpenAI
+
 from agent.graph import ScoringAgent
 from models.bedrock import HolisticAIBedrockChat
 from models.schemas import HealthResponse, ScoreRequest, ScoreResponse
@@ -44,9 +46,18 @@ load_dotenv()
 class Settings(BaseSettings):
     """Application settings."""
 
-    # HolisticAI Bedrock
-    holistic_ai_team_id: str
-    holistic_ai_api_token: str
+    # LLM Provider ("openai" or "holistic_ai")
+    llm_provider: str = "openai"
+
+    # OpenAI
+    openai_api_key: Optional[str] = None
+    openai_model: str = "gpt-4o"
+    openai_temperature: float = 0.7
+    openai_max_tokens: int = 1024
+
+    # HolisticAI Bedrock (legacy support)
+    holistic_ai_team_id: Optional[str] = None
+    holistic_ai_api_token: Optional[str] = None
     holistic_ai_api_endpoint: str = (
         "https://ctwa92wg1b.execute-api.us-east-1.amazonaws.com/prod/invoke"
     )
@@ -122,15 +133,31 @@ limiter = Limiter(key_func=get_remote_address)
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
-# Initialize LLM and agent
-llm = HolisticAIBedrockChat(
-    team_id=settings.holistic_ai_team_id,
-    api_token=SecretStr(settings.holistic_ai_api_token),
-    api_endpoint=settings.holistic_ai_api_endpoint,
-    model=settings.holistic_ai_model,
-    temperature=0.7,
-    max_tokens=1024,
-)
+# Initialize LLM based on provider setting
+if settings.llm_provider == "openai":
+    if not settings.openai_api_key:
+        raise ValueError("OpenAI API key is required when llm_provider is 'openai'")
+    llm = ChatOpenAI(
+        model=settings.openai_model,
+        temperature=settings.openai_temperature,
+        max_tokens=settings.openai_max_tokens,
+        api_key=settings.openai_api_key,
+    )
+    logger.info(f"Initialized OpenAI LLM with model: {settings.openai_model}")
+elif settings.llm_provider == "holistic_ai":
+    if not settings.holistic_ai_team_id or not settings.holistic_ai_api_token:
+        raise ValueError("HolisticAI credentials are required when llm_provider is 'holistic_ai'")
+    llm = HolisticAIBedrockChat(
+        team_id=settings.holistic_ai_team_id,
+        api_token=SecretStr(settings.holistic_ai_api_token),
+        api_endpoint=settings.holistic_ai_api_endpoint,
+        model=settings.holistic_ai_model,
+        temperature=0.7,
+        max_tokens=1024,
+    )
+    logger.info(f"Initialized HolisticAI Bedrock LLM with model: {settings.holistic_ai_model}")
+else:
+    raise ValueError(f"Invalid llm_provider: {settings.llm_provider}. Must be 'openai' or 'holistic_ai'")
 
 agent = ScoringAgent(llm)
 
