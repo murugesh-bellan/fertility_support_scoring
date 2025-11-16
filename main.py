@@ -11,6 +11,7 @@ from typing import Optional
 from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import Response
+from langsmith import Client as LangSmithClient
 from langsmith import uuid7
 from pydantic import SecretStr
 from pydantic_settings import BaseSettings
@@ -61,6 +62,8 @@ class Settings(BaseSettings):
     cache_enabled: bool = True
     rate_limit_per_minute: int = 60
     max_message_length: int = 2000
+    environment: str = "production"
+    version: str = "0.1.0"
 
     class Config:
         env_file = ".env"
@@ -75,6 +78,7 @@ logger = logging.getLogger(__name__)
 
 # Setup LangSmith if configured
 langsmith_enabled = False
+langsmith_client = None
 if settings.langsmith_api_key and settings.langsmith_tracing:
     try:
         os.environ["LANGCHAIN_TRACING_V2"] = "true"
@@ -82,10 +86,15 @@ if settings.langsmith_api_key and settings.langsmith_tracing:
         os.environ["LANGCHAIN_PROJECT"] = settings.langsmith_project
         os.environ["LANGCHAIN_ENDPOINT"] = settings.langsmith_endpoint
         langsmith_enabled = True
+        langsmith_client = LangSmithClient(
+            api_key=settings.langsmith_api_key,
+            api_url=settings.langsmith_endpoint
+        )
         logger.info(f"LangSmith tracing enabled for project: {settings.langsmith_project}")
     except Exception as e:
         logger.warning(f"Failed to initialize LangSmith tracing: {e}")
         langsmith_enabled = False
+        langsmith_client = None
 else:
     logger.info("LangSmith tracing disabled")
 
@@ -192,13 +201,16 @@ async def score_message(request: Request, score_request: ScoreRequest) -> ScoreR
                 "run_name": "score_message",
                 "run_id": correlation_uuid,  # Use UUID object, not string
                 "metadata": {
+                    "user_id": settings.holistic_ai_team_id,
+                    "model": settings.holistic_ai_model,
+                    "version": settings.version,
+                    "environment": settings.environment,
                     "request_id": correlation_id,
                     "message_hash": message_hash,
                     "injection_detected": is_injection,
                     "injection_patterns": patterns if is_injection else [],
                     "message_length": len(message),
                     "cache_enabled": settings.cache_enabled,
-                    "environment": "production",
                 },
                 "tags": [
                     "fertility-support",
@@ -214,6 +226,22 @@ async def score_message(request: Request, score_request: ScoreRequest) -> ScoreR
             langsmith_enabled=langsmith_enabled,
             run_id=correlation_id
         )
+
+        # Update LangSmith run with dynamic tags from key_indicators
+        if langsmith_enabled and langsmith_client and "key_indicators" in result:
+            try:
+                # Add key_indicators as tags to the run
+                dynamic_tags = [
+                    f"indicator:{indicator.lower().replace(' ', '-')}"
+                    for indicator in result["key_indicators"]
+                ]
+                # Update the run with additional tags
+                langsmith_client.update_run(
+                    run_id=correlation_uuid,
+                    tags=dynamic_tags
+                )
+            except Exception as e:
+                logger.warning(f"Failed to update LangSmith run with dynamic tags: {e}")
 
         # Calculate metrics
         latency = time.time() - start_time

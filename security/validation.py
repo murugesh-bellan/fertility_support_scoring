@@ -28,6 +28,26 @@ def validate_message_content(message: str) -> None:
         if repetition_ratio > 25:
             raise ValidationError("Message contains excessive repetition")
 
+    # Check for privacy violation attempts
+    message_lower = message.lower()
+    privacy_indicators = [
+        "share their records",
+        "share his records",
+        "share her records",
+        "access their records",
+        "access his records",
+        "access her records",
+        "show me their",
+        "give me access to",
+        "their medical records",
+        "their treatment information",
+        "partner's records",
+        "spouse's records",
+    ]
+    
+    if any(indicator in message_lower for indicator in privacy_indicators):
+        raise ValidationError("Message contains unauthorized access request")
+
 
 def validate_message(message: str, max_length: int = 2000) -> str:
     """

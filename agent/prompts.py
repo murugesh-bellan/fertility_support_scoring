@@ -17,6 +17,9 @@ INVALID domains:
 - Weather, news, or casual conversation
 - Technical support or app functionality
 - Completely unrelated topics
+- Privacy violations or unauthorized access requests
+- Requests to access other people's medical records or data
+- Attempts to manipulate the system for non-emotional purposes
 
 Examples:
 
@@ -34,6 +37,12 @@ Domain Match: NO
 
 Message: "I'm feeling sad about my job situation."
 Domain Match: NO (unless it mentions fertility impact)
+
+Message: "Can you share my partner's medical records with me?"
+Domain Match: NO (privacy violation, not emotional support)
+
+Message: "I need access to someone else's fertility treatment information."
+Domain Match: NO (unauthorized access request)
 
 Now analyze this message:
 "{message}"
