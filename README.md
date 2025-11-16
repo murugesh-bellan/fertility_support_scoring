@@ -1,4 +1,4 @@
-# Fertility Sync/Fertility Support Scoring🤖💚
+# Fertility Support Agent 🤖💚
 
 An agentic AI system that analyzes text messages from women undergoing fertility treatment, scores emotional distress (1-10), and triggers appropriate interventions.
 
@@ -52,21 +52,130 @@ uv run uvicorn main:app --reload
 
 ### 4. Test the API
 ```bash
-# Normal message
+# Using the demo script (recommended)
+bash demo.sh
+
+# Or test manually with curl
 curl -X POST http://localhost:8000/score \
   -H "Content-Type: application/json" \
   -d '{"message": "Another negative test today. Feeling really sad."}'
-
-# Crisis message
-curl -X POST http://localhost:8000/score \
-  -H "Content-Type: application/json" \
-  -d '{"message": "I cannot do this anymore. There is no point."}'
-
-# Out-of-domain
-curl -X POST http://localhost:8000/score \
-  -H "Content-Type: application/json" \
-  -d '{"message": "What is the weather today?"}'
 ```
+
+## Development Environment Setup
+
+### Enable Development Mode
+
+To enable the dashboard and additional development features, set the environment to `dev` in your `.env` file:
+
+```bash
+ENVIRONMENT=dev
+```
+
+**Important**: Development mode enables CORS for local dashboard access. For production deployments, set `ENVIRONMENT=production` to disable CORS.
+
+### Using the Interactive Dashboard
+
+The project includes a web-based dashboard (`dashboard.html`) for testing and monitoring in development mode.
+
+#### Starting the Dashboard
+
+1. Ensure the server is running in dev mode:
+   ```bash
+   # Make sure ENVIRONMENT=dev in your .env file
+   uv run uvicorn main:app --reload
+   ```
+
+2. Open the dashboard:
+   ```bash
+   # Simply open the file in your browser
+   open dashboard.html
+   # Or drag dashboard.html to your browser
+   ```
+
+#### Dashboard Features
+
+**Real-time Monitoring:**
+- System health status (API, Bedrock, Cache)
+- Live request metrics (total requests, avg latency, avg tokens)
+- Security monitoring (injection attempts, errors, success rate)
+- Auto-refresh every 5 seconds
+
+**Interactive Testing:**
+The dashboard includes 11 pre-configured test cases from `demo.sh`:
+
+| Button | Category | Description |
+|--------|----------|-------------|
+| 🚨 Crisis | Score 10 | Emergency/suicidal ideation |
+| 😢 High Distress | Score 8-9 | Severe emotional distress |
+| 📝 Normal | Score 6-7 | Moderate concern |
+| 😊 Positive | Score 1-2 | Positive/hopeful message |
+| 🤔 Young & Uncertain | Score 3-5 | First-time IVF, uncertain |
+| 😰 Cultural Pressure | Score 6-7 | Family/cultural stress |
+| 💬 Gender Pronoun | Score 2-3 | Partner communication |
+| ❌ Out of Domain | Score -1 | Non-fertility related |
+| 🛡️ Injection Attack | Security | Prompt injection attempt |
+| ⚠️ Privacy Breach | Security | Data access attempt |
+| 🎭 Pretend Attack | Security | Role-play attack |
+
+**Testing Workflow:**
+1. Click any example button to load a test message
+2. Click "Score Message" to analyze
+3. View detailed results including:
+   - Emotional distress score (1-10)
+   - Confidence level
+   - Reasoning and key indicators
+   - Recommended action
+   - Performance metrics (latency, tokens)
+   - Security alerts (if injection detected)
+
+#### Running Automated Tests
+
+For comprehensive testing, use the included demo script:
+
+```bash
+# Run all 11 test cases
+bash demo.sh
+
+# View specific test categories:
+# - Normal emotional distress (scores 1-10)
+# - Out-of-domain detection
+# - Security/injection attempts
+# - Cultural sensitivity tests
+```
+
+### Environment Variables for Development
+
+Key development settings in `.env`:
+
+```bash
+# Environment (dev enables CORS for dashboard)
+ENVIRONMENT=dev
+
+# Logging (set to DEBUG for verbose output)
+LOG_LEVEL=INFO
+
+# LangSmith tracing (optional, for debugging)
+LANGSMITH_API_KEY=your_key_here
+LANGSMITH_TRACING=true
+LANGSMITH_PROJECT=fertility-support-agent
+
+# Rate limiting (adjust for testing)
+RATE_LIMIT_PER_MINUTE=60
+```
+
+### Switching to Production
+
+To deploy in production mode:
+
+1. Update `.env`:
+   ```bash
+   ENVIRONMENT=production
+   LOG_LEVEL=WARNING
+   ```
+
+2. CORS will be automatically disabled
+3. Dashboard will not work (as intended for security)
+4. Use API endpoints directly or build a production frontend
 
 ## API Endpoints
 
@@ -147,6 +256,8 @@ uv run ruff check .
 ```
 fertility-support-scoring/
 ├── main.py                 # FastAPI server
+├── dashboard.html          # Interactive web dashboard (dev mode)
+├── demo.sh                 # Automated test script
 ├── agent/
 │   ├── graph.py           # LangGraph agent
 │   ├── prompts.py         # Prompt templates

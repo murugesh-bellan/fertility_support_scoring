@@ -10,6 +10,7 @@ from typing import Optional
 
 from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException, Request
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import Response
 from langsmith import Client as LangSmithClient
 from langsmith import uuid7
@@ -104,6 +105,17 @@ app = FastAPI(
     description="Emotional distress scoring for fertility treatment patients",
     version="0.1.0",
 )
+
+# Configure CORS to allow dashboard access (only in dev environment)
+if settings.environment == "dev":
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=["*"],
+        allow_credentials=True,
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
+    logger.info("CORS middleware enabled for development environment")
 
 # Rate limiting
 limiter = Limiter(key_func=get_remote_address)
